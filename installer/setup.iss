@@ -32,7 +32,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 
 [Languages]
-Name: "cht"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"
+; 語言檔由 CI 從 Inno Setup 官方原始碼庫下載到本資料夾（Chocolatey 版沒附繁中）
+Name: "cht"; MessagesFile: "ChineseTraditional.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "建立桌面捷徑"; GroupDescription: "附加工作："

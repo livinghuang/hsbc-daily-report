@@ -89,6 +89,18 @@ jobs:
       - name: 安裝 Inno Setup
         run: choco install innosetup --no-progress -y
 
+      - name: 取得繁體中文語言檔
+        shell: pwsh
+        working-directory: installer
+        # Chocolatey 裝的 Inno Setup 不含繁中語言檔，從官方原始碼庫抓一份放在旁邊用
+        run: |
+          $url = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseTraditional.isl"
+          Invoke-WebRequest -Uri $url -OutFile "ChineseTraditional.isl"
+          if ((Get-Item "ChineseTraditional.isl").Length -lt 5000) {
+            throw "下載到的語言檔太小，可能不是正確的檔案"
+          }
+          "語言檔大小： {0:N0} bytes" -f (Get-Item "ChineseTraditional.isl").Length
+
       - name: 編譯安裝程式
         working-directory: installer
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss'

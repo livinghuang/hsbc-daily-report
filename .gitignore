@@ -26,3 +26,6 @@ venv/
 
 # 舊版腳本把持股代號寫死在裡面，不要上傳
 legacy/
+
+# CI 下載的 Inno Setup 語言檔
+installer/ChineseTraditional.isl
