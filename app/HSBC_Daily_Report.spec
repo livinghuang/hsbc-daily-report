@@ -12,8 +12,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # 這些是 yfinance/pandas 拖進來但這支程式用不到的，拿掉可以讓 exe 小很多
-    excludes=['matplotlib', 'scipy', 'PIL', 'PyQt5', 'PySide2', 'notebook', 'IPython'],
+    # 這些是 yfinance/pandas 拖進來但這支程式用不到的，拿掉可以讓 exe 小很多。
+    # 注意：PIL 不能排除 —— reportlab.lib.utils 會 import 它，排掉就整個起不來。
+    excludes=['matplotlib', 'scipy', 'PyQt5', 'PySide2', 'notebook', 'IPython'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
