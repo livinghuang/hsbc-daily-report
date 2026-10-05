@@ -56,25 +56,32 @@ def execute_report(settings: cfg.Settings, log):
 # ========================= 無視窗模式 =========================
 
 def run_headless() -> int:
-    """給工作排程器呼叫：不開視窗，跑完就結束，結果寫進 log。"""
-    lines = []
+    """給工作排程器呼叫：不開視窗，跑完就結束，結果寫進 log。
+
+    這裡絕對不能讓例外往外丟 —— 打包成視窗程式後，未攔截的例外會跳出一個
+    modal 對話框，而背景排程沒有人會去按「確定」，程式就會永遠卡在那裡。
+    """
+    lines = [f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {APP_TITLE} {APP_VERSION} 排程執行"]
 
     def log(message):
         lines.append(str(message))
 
-    log(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {APP_TITLE} {APP_VERSION} 排程執行")
-    settings = cfg.Settings.load()
     try:
+        settings = cfg.Settings.load()
         result = execute_report(settings, log)
         log(f"完成：收盤日 {result.trade_date:%Y-%m-%d}")
         settings.save()
-        write_log(lines)
-        return 0
+        code = 0
     except Exception as e:
         log(f"ERROR: {e}")
         log(traceback.format_exc())
+        code = 1
+
+    try:
         write_log(lines)
-        return 1
+    except OSError:
+        pass  # 連 log 都寫不出來也不能卡住，安靜結束讓排程器記下結束碼
+    return code
 
 
 # =========================== GUI ===========================

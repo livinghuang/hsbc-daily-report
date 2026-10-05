@@ -37,7 +37,10 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,          # 視窗程式，排程執行時不會閃黑視窗
-    disable_windowed_traceback=False,
+    # 關鍵：視窗程式發生未攔截的例外時，PyInstaller 預設會跳出一個 modal 對話框。
+    # 排程是在背景跑的、沒有人會去按「確定」，那個對話框會讓程式永遠卡住。
+    # 關掉它，錯誤一律寫進 log 檔就好。
+    disable_windowed_traceback=True,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,

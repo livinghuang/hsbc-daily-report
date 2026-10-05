@@ -48,8 +48,14 @@ jobs:
       - name: 冒煙測試（--run 應該因為還沒設定資料來源而失敗，但不可以當掉）
         shell: pwsh
         working-directory: installer/dist
+        timeout-minutes: 3
         run: |
-          $p = Start-Process -FilePath ".\HSBC Daily Report.exe" -ArgumentList "--run" -PassThru -Wait
+          $p = Start-Process -FilePath ".\HSBC Daily Report.exe" -ArgumentList "--run" -PassThru
+          # 不能無限等：視窗程式若跳出錯誤對話框會永遠卡住，限時砍掉才看得出問題
+          if (-not $p.WaitForExit(90000)) {
+            $p.Kill()
+            throw "--run 在 90 秒內沒有結束，可能跳出了對話框或開了 GUI"
+          }
           "結束碼：$($p.ExitCode)"
           if ($p.ExitCode -ne 1) {
             throw "預期結束碼 1（尚未設定資料來源），實際為 $($p.ExitCode)"
