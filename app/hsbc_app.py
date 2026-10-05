@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import queue
 import sys
 import threading
@@ -15,11 +16,15 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-import hsbc_config as cfg
-import hsbc_core as core
-
 APP_TITLE = "HSBC Daily Report"
 APP_VERSION = "1.0.0"
+
+# 這個模組刻意只在最上層 import 標準函式庫。
+# reportlab / openpyxl 這些第三方套件改在 main() 裡 import，才能把「連 import 都失敗」
+# 的情況也攔下來寫進 log —— 否則打包成視窗程式後，匯入階段的例外會變成一個沒人按得到
+# 的 modal 對話框，排程就永遠卡在那裡（2026-10-05 實際在 CI 上踩到）。
+cfg = None
+core = None
 
 
 # ======================= 共用：執行與記錄 =======================
@@ -395,27 +400,49 @@ def run_gui():
     root.mainloop()
 
 
+def _startup_log_dir() -> Path:
+    """不經過 hsbc_config 自己算出 log 目錄 —— 連 import 都失敗時也要寫得出東西。"""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    else:
+        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / APP_TITLE / "logs"
+
+
 def _trace_startup(stage: str):
     """把啟動過程寫進 startup.log。
 
-    排程執行時沒有主控台可看，程式若卡在啟動階段（還沒寫出正式 log）就完全沒有線索，
-    所以這裡每經過一個階段就補一行，事後才查得出卡在哪裡。
+    排程執行時沒有主控台可看，程式若卡在啟動階段就完全沒有線索，
+    所以每經過一個階段補一行，事後才查得出卡在哪裡。
     """
     try:
-        cfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(cfg.LOG_DIR / "startup.log", "a", encoding="utf-8") as f:
+        log_dir = _startup_log_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with open(log_dir / "startup.log", "a", encoding="utf-8") as f:
             f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {stage}\n")
     except OSError:
         pass
 
 
 def main() -> int:
+    global cfg, core
+
     _trace_startup(f"啟動 argv={sys.argv!r} frozen={getattr(sys, 'frozen', False)}")
+    try:
+        import hsbc_config
+        import hsbc_core
+        cfg, core = hsbc_config, hsbc_core
+    except BaseException:
+        _trace_startup("匯入模組失敗：\n" + traceback.format_exc())
+        return 2
+    _trace_startup("模組匯入完成")
+
     if "--run" in sys.argv[1:]:
         _trace_startup("模式：無視窗排程執行")
         code = run_headless()
         _trace_startup(f"無視窗執行結束，結束碼={code}")
         return code
+
     _trace_startup("模式：開啟圖形介面")
     run_gui()
     _trace_startup("圖形介面關閉")
@@ -423,4 +450,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # 最外層再兜一層：任何沒攔到的例外都要寫進 log 然後安靜結束，
+    # 絕不能讓它變成一個擋住排程的對話框。
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException:
+        _trace_startup("未攔截的例外：\n" + traceback.format_exc())
+        sys.exit(2)
