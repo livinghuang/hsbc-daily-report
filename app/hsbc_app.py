@@ -395,10 +395,30 @@ def run_gui():
     root.mainloop()
 
 
+def _trace_startup(stage: str):
+    """把啟動過程寫進 startup.log。
+
+    排程執行時沒有主控台可看，程式若卡在啟動階段（還沒寫出正式 log）就完全沒有線索，
+    所以這裡每經過一個階段就補一行，事後才查得出卡在哪裡。
+    """
+    try:
+        cfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(cfg.LOG_DIR / "startup.log", "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {stage}\n")
+    except OSError:
+        pass
+
+
 def main() -> int:
+    _trace_startup(f"啟動 argv={sys.argv!r} frozen={getattr(sys, 'frozen', False)}")
     if "--run" in sys.argv[1:]:
-        return run_headless()
+        _trace_startup("模式：無視窗排程執行")
+        code = run_headless()
+        _trace_startup(f"無視窗執行結束，結束碼={code}")
+        return code
+    _trace_startup("模式：開啟圖形介面")
     run_gui()
+    _trace_startup("圖形介面關閉")
     return 0
 
 

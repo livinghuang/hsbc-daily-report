@@ -66,7 +66,13 @@ jobs:
             "=== 卡住了，診斷資訊 ==="
             "MainWindowTitle: '$($p.MainWindowTitle)'"
             "MainWindowHandle: $($p.MainWindowHandle)"
-            if ($log) { "--- log ---"; Get-Content $log.FullName } else { "（沒有寫出任何 log 檔）" }
+            # onefile 的視窗屬於子行程，所以也要看所有同名行程
+            Get-Process -Name "HSBC Daily Report" -ErrorAction SilentlyContinue |
+              Format-Table Id, MainWindowTitle, StartTime -AutoSize | Out-String
+            $startup = Join-Path $logDir "startup.log"
+            if (Test-Path $startup) { "--- startup.log ---"; Get-Content $startup }
+            else { "（連 startup.log 都沒有：卡在 Python 程式碼執行之前）" }
+            if ($log) { "--- log ---"; Get-Content $log.FullName } else { "（沒有寫出任何執行 log）" }
             $p.Kill()
             throw "--run 在 90 秒內沒有結束"
           }
