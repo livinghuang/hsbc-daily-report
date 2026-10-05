@@ -3,7 +3,7 @@
 
 #define AppName "HSBC Daily Report"
 #define AppNameCht "HSBC 每日庫存損益報表"
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.1"
 #define AppPublisher "HSBC Daily Report"
 #define AppExeName "HSBC Daily Report.exe"
 

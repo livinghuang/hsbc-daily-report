@@ -2,8 +2,8 @@
 # 右鍵 exe →「內容 → 詳細資料」看到的就是這裡的內容。
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -18,11 +18,11 @@ VSVersionInfo(
           '040404b0',
           [StringStruct('CompanyName', 'HSBC Daily Report'),
            StringStruct('FileDescription', 'HSBC 每日庫存損益報表'),
-           StringStruct('FileVersion', '1.0.0.0'),
+           StringStruct('FileVersion', '1.0.1.0'),
            StringStruct('InternalName', 'HSBC_Daily_Report'),
            StringStruct('OriginalFilename', 'HSBC Daily Report.exe'),
            StringStruct('ProductName', 'HSBC Daily Report'),
-           StringStruct('ProductVersion', '1.0.0.0')]
+           StringStruct('ProductVersion', '1.0.1.0')]
         )
       ]
     ),

@@ -1,5 +1,9 @@
 yfinance>=0.2.40
-pandas>=2.0
+# pandas 釘在 2.2.3：Windows 11「智慧型應用程式控制」(Smart App Control) 會封鎖信譽不足的未簽章 DLL，
+# pandas 3.x 的 _libs\reshape.pyd 實測被擋（ImportError: 應用程式控制原則已封鎖此檔案），2.2.3 可以正常載入。
+# 升級前請先在開著 Smart App Control 的機器上確認 `import pandas` 不會被擋。
+pandas==2.2.3
+numpy<2.3
 openpyxl>=3.1
 reportlab>=4.0
 # reportlab.lib.utils 會 import PIL，所以 pillow 是執行期必要相依，不是只有產生圖示時才要
