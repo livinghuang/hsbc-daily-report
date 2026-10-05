@@ -113,10 +113,11 @@ def split_runs(text):
 class MixedFontText(Flowable):
     """一格文字：中文與英數字各用各的字型，單行不換行。
 
-    跟 Excel 一樣，文字太長就往旁邊溢出（而不是折行或被截斷）。
+    跟 Excel 一樣，文字太長就往右邊的空白格溢出（而不是折行）；
+    max_width 是可溢出的總寬度，連溢出都放不下時就縮小字級，避免壓到旁邊有內容的格子。
     """
 
-    def __init__(self, text, size, color, align, width, height, bold):
+    def __init__(self, text, size, color, align, width, height, bold, max_width=None):
         super().__init__()
         self.text = text
         self.size = size
@@ -125,6 +126,7 @@ class MixedFontText(Flowable):
         self.width = width
         self.height = height
         self.bold = bold
+        self.max_width = max_width
 
     def _runs(self):
         latin = FONT_LATIN_BOLD if self.bold else FONT_LATIN
@@ -136,7 +138,11 @@ class MixedFontText(Flowable):
 
     def draw(self):
         runs = self._runs()
-        total = sum(pdfmetrics.stringWidth(t, f, self.size) for t, f in runs)
+        size = self.size
+        total = sum(pdfmetrics.stringWidth(t, f, size) for t, f in runs)
+        if self.max_width and total > self.max_width:
+            size *= self.max_width / total
+            total = self.max_width
 
         if self.align == "RIGHT":
             x = self.width - total
@@ -145,12 +151,12 @@ class MixedFontText(Flowable):
         else:
             x = 0
 
-        y = (self.height - self.size) / 2 + self.size * 0.22
+        y = (self.height - size) / 2 + size * 0.22
         self.canv.setFillColor(self.color)
         for text, font in runs:
-            self.canv.setFont(font, self.size)
+            self.canv.setFont(font, size)
             self.canv.drawString(x, y, text)
-            x += pdfmetrics.stringWidth(text, font, self.size)
+            x += pdfmetrics.stringWidth(text, font, size)
 
 
 # ====================== 抓行情 ======================
@@ -426,10 +432,19 @@ def render_pdf(ws, grid, max_row, max_col, trade_date, pdf_path):
             if any(ord(ch) > 0x2E80 for ch in text):
                 # 含中文：交給 MixedFontText 自己畫，中英文各用各的字型
                 cell_width = merged_width.get((r, c), col_widths[c - 1])
+                max_width = None
+                if align == "LEFT":
+                    # 跟 Excel 一樣只能溢出到右邊連續的空白格，碰到有內容的格子就停
+                    overflow = cell_width
+                    for nc in range(c + 1, max_col + 1):
+                        if grid.get((r, nc)) not in (None, ""):
+                            break
+                        overflow += col_widths[nc - 1]
+                    max_width = overflow - 3 * scale
                 row_data.append(
                     MixedFontText(
                         text, font_size, color, align,
-                        cell_width - 3 * scale, height * scale, bold,
+                        cell_width - 3 * scale, height * scale, bold, max_width,
                     )
                 )
             else:
