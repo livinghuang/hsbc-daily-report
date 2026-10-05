@@ -68,7 +68,8 @@ def main():
     # （不能從 16x16 存，否則每個尺寸都會被壓成 16x16）
     master = draw_icon(max(SIZES))
     master.save(OUT, format="ICO", sizes=[(s, s) for s in SIZES])
-    print(f"已產生圖示：{OUT}")
+    # 只印 ASCII：Windows 主控台預設是 cp1252，印中文會丟 UnicodeEncodeError
+    print(f"icon written: {OUT}")
 
 
 if __name__ == "__main__":

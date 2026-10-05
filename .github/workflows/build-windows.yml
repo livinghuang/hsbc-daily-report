@@ -12,6 +12,11 @@ jobs:
   build:
     runs-on: windows-latest
 
+    env:
+      # Windows 主控台預設 cp1252，不設這個的話腳本印出中文會丟 UnicodeEncodeError
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+
     steps:
       - uses: actions/checkout@v4
 
