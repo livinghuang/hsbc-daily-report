@@ -3,7 +3,7 @@
 
 #define AppName "HSBC Daily Report"
 #define AppNameCht "HSBC 每日庫存損益報表"
-#define AppVersion "1.0.1"
+#define AppVersion "1.0.2"
 #define AppPublisher "HSBC Daily Report"
 #define AppExeName "HSBC Daily Report.exe"
 
@@ -52,7 +52,7 @@ Name: "{autodesktop}\{#AppNameCht}"; Filename: "{app}\{#AppExeName}"; IconFilena
 [Run]
 ; 勾了「每天自動產生報表」才建立排程，預設 06:30，之後可在程式裡改
 Filename: "powershell.exe"; \
-    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$a = New-ScheduledTaskAction -Execute '{app}\{#AppExeName}' -Argument '--run' -WorkingDirectory '{app}'; $t = New-ScheduledTaskTrigger -Daily -At '06:30'; $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1); $p = New-ScheduledTaskPrincipal -UserId \""$env:USERDOMAIN\$env:USERNAME\"" -LogonType S4U -RunLevel Limited; Unregister-ScheduledTask -TaskName '{#AppName}' -Confirm:$false -ErrorAction SilentlyContinue; Register-ScheduledTask -TaskName '{#AppName}' -Action $a -Trigger $t -Settings $s -Principal $p -Description '每日自動更新 HSBC 庫存損益並輸出 PDF' | Out-Null"""; \
+    Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""$a = New-ScheduledTaskAction -Execute '{app}\{#AppExeName}' -Argument '--run' -WorkingDirectory '{app}'; $t = New-ScheduledTaskTrigger -Daily -At '06:30'; $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1); $p = New-ScheduledTaskPrincipal -UserId \""$env:USERDOMAIN\$env:USERNAME\"" -LogonType S4U -RunLevel Limited; Unregister-ScheduledTask -TaskName '{#AppName}' -Confirm:$false -ErrorAction SilentlyContinue; Register-ScheduledTask -TaskName '{#AppName}' -Action $a -Trigger $t -Settings $s -Principal $p -Description '每日自動更新 HSBC 庫存損益並輸出 PDF' | Out-Null"""; \
     Flags: runhidden waituntilterminated; \
     StatusMsg: "正在建立每日自動排程..."; \
     Tasks: dailytask

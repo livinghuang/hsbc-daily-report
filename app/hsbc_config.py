@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -111,8 +114,54 @@ def schedule_status() -> tuple[bool, str]:
     return True, f"每天 {time_part} 自動執行"
 
 
+def _run_powershell_elevated(script: str) -> None:
+    """用系統管理員權限（跳 UAC）跑一段 PowerShell，失敗就丟 RuntimeError。
+
+    S4U 排程的建立／修改／刪除都需要系統管理員權限，GUI 是一般權限，
+    直接跑會得到「存取被拒」。而且 PowerShell 的 cmdlet 錯誤預設不會中止，
+    以前就是這樣：註冊失敗了還印出成功，排程時間根本沒改到。
+    """
+    # 不用 mkdtemp：Python 3.12 的 mkdtemp 會設成只有自己能讀的 ACL，
+    # 提權後寫出的檔案擁有者變成 Administrators，一般權限這邊會讀不到
+    tmp = Path(tempfile.gettempdir()) / f"hsbc_task_{uuid.uuid4().hex}"
+    tmp.mkdir()
+    script_path = tmp / "task.ps1"
+    result_path = tmp / "result.txt"
+    wrapped = f"""$ErrorActionPreference = 'Stop'
+try {{
+{script}
+}} catch {{
+    Set-Content -LiteralPath '{result_path}' -Value $_.Exception.Message -Encoding UTF8
+    exit 1
+}}
+"""
+    # PowerShell 5.1 要有 BOM 才會把 .ps1 當 UTF-8 讀（描述文字有中文）
+    script_path.write_text(wrapped, encoding="utf-8-sig")
+    launcher = (
+        "$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden "
+        f"-ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{script_path}\"'; "
+        "exit $p.ExitCode"
+    )
+    try:
+        proc = _run_powershell(launcher)
+        if proc.returncode == 0:
+            return
+        try:
+            detail = result_path.read_text(encoding="utf-8-sig").strip()
+        except OSError:
+            detail = ""
+        raise RuntimeError(detail or proc.stderr.strip() or "未取得系統管理員權限（UAC 被取消？）")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _current_user() -> str:
+    # 在一般權限這邊先決定帳號：UAC 若輸入別的管理員帳密，提權後的 $env:USERNAME 會變成那個人
+    return f"{os.environ.get('USERDOMAIN', '')}\\{os.environ.get('USERNAME', '')}"
+
+
 def enable_schedule(time_text: str) -> str:
-    """建立／更新每日排程。
+    """建立／更新每日排程（會跳 UAC）。
 
     用 S4U 登入型態：不需要存密碼，使用者不用保持登入也能背景執行。
     （這一版不需要互動式 Excel，所以不必像舊版綁定「僅登入時執行」。）
@@ -124,23 +173,22 @@ def enable_schedule(time_text: str) -> str:
     work_dir = str(Path(exe).parent)
     # 排程執行時帶 --run，走無視窗模式，不開 GUI
     script = f"""
-$action = New-ScheduledTaskAction -Execute '{exe}' -Argument '{arguments}' -WorkingDirectory '{work_dir}'
-$trigger = New-ScheduledTaskTrigger -Daily -At "{time_text}"
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
-    -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1)
-$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\\$env:USERNAME" `
-    -LogonType S4U -RunLevel Limited
-if (Get-ScheduledTask -TaskName "{TASK_NAME}" -ErrorAction SilentlyContinue) {{
-    Unregister-ScheduledTask -TaskName "{TASK_NAME}" -Confirm:$false
-}}
-Register-ScheduledTask -TaskName "{TASK_NAME}" -Action $action -Trigger $trigger `
-    -Settings $settings -Principal $principal `
-    -Description "每日自動更新 HSBC 庫存損益並輸出 PDF" | Out-Null
-"Scheduled"
+    $action = New-ScheduledTaskAction -Execute '{exe}' -Argument '{arguments}' -WorkingDirectory '{work_dir}'
+    $trigger = New-ScheduledTaskTrigger -Daily -At "{time_text}"
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
+        -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+    $principal = New-ScheduledTaskPrincipal -UserId '{_current_user()}' `
+        -LogonType S4U -RunLevel Limited
+    Register-ScheduledTask -TaskName "{TASK_NAME}" -Action $action -Trigger $trigger `
+        -Settings $settings -Principal $principal -Force `
+        -Description "每日自動更新 HSBC 庫存損益並輸出 PDF" | Out-Null
 """
-    proc = _run_powershell(script)
-    if proc.returncode != 0:
-        raise RuntimeError(f"建立排程失敗：{proc.stderr.strip()}")
+    _run_powershell_elevated(script)
+
+    enabled, status = schedule_status()
+    if not enabled or time_text not in status:
+        raise RuntimeError(f"排程沒有更新成功（目前狀態：{status}）")
     return f"已設定每天 {time_text} 自動執行"
 
 
@@ -148,12 +196,11 @@ def disable_schedule() -> str:
     if sys.platform != "win32":
         raise RuntimeError("只有 Windows 支援自動排程")
 
-    proc = _run_powershell(
-        f'Unregister-ScheduledTask -TaskName "{TASK_NAME}" -Confirm:$false '
-        '-ErrorAction SilentlyContinue; "Removed"'
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(f"移除排程失敗：{proc.stderr.strip()}")
+    enabled, _ = schedule_status()
+    if enabled:
+        _run_powershell_elevated(
+            f'    Unregister-ScheduledTask -TaskName "{TASK_NAME}" -Confirm:$false'
+        )
     return "已關閉自動排程"
 
 

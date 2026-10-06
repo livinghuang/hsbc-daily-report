@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 APP_TITLE = "HSBC Daily Report"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 # 這個模組刻意只在最上層 import 標準函式庫。
 # reportlab / openpyxl 這些第三方套件改在 main() 裡 import，才能把「連 import 都失敗」
