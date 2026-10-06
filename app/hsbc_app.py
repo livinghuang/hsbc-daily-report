@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 APP_TITLE = "HSBC Daily Report"
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 # 這個模組刻意只在最上層 import 標準函式庫。
 # reportlab / openpyxl 這些第三方套件改在 main() 裡 import，才能把「連 import 都失敗」
@@ -305,6 +305,35 @@ def run_gui():
         log_text.insert("end", f"{message}\n")
         log_text.see("end")
         log_text.configure(state="disabled")
+
+    def load_saved_logs():
+        """從 log 檔重建紀錄頁。排程是另一個背景程序在跑，只會寫檔，
+        所以不能只顯示這個視窗自己執行過的輸出。"""
+        if running.get():
+            return  # 執行中就別清掉正在輸出的內容
+        log_text.configure(state="normal")
+        log_text.delete("1.0", "end")
+        log_text.configure(state="disabled")
+        files = sorted(cfg.LOG_DIR.glob("run_*.log"))[-30:]
+        if not files:
+            append_log("（目前沒有執行紀錄）")
+            return
+        for path in files:
+            try:
+                stamp = datetime.strptime(path.stem, "run_%Y%m%d_%H%M%S")
+                header = f"{stamp:%Y-%m-%d %H:%M:%S}"
+            except ValueError:
+                header = path.name
+            try:
+                body = path.read_text(encoding="utf-8").rstrip()
+            except OSError as e:
+                body = f"（讀不到 {path.name}：{e}）"
+            append_log(f"—— {header} ——\n{body}\n")
+
+    notebook.bind(
+        "<<NotebookTabChanged>>",
+        lambda _e: load_saved_logs() if notebook.select() == str(tab_log) else None,
+    )
 
     # ---------------------- 執行流程 ----------------------
     collected: list[str] = []
